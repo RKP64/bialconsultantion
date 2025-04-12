@@ -83,7 +83,6 @@ def generate_answer(question, temperature=0.7, max_tokens=200):
     response = openai.ChatCompletion.create(
         engine=DEPLOYMENT_ID,          # Updated parameter: use 'engine' for Azure deployments
         messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,       # Pass the temperature as defined
         max_tokens=max_tokens          # Use 'max_tokens' instead of 'max_completion_tokens'
     )
     answer = response.choices[0].message["content"]
