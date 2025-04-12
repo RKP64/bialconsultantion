@@ -1,13 +1,27 @@
 import streamlit as st
 import openai
-import json
 import base64
 from azure.search.documents import SearchClient
 from azure.core.credentials import AzureKeyCredential
 
 ###################################
-# Credentials from Streamlit Secrets
+# Retrieve Credentials from Streamlit Secrets
 ###################################
+# Add these in your Streamlit Cloud Secrets UI or in a local .streamlit/secrets.toml file.
+# Example secrets.toml:
+#
+# [azure]
+# search_endpoint = "https://your-search-endpoint.search.windows.net"
+# search_api_key = "your-azure-search-api-key"
+# search_index_name = "your-search-index-name"
+#
+# [openai]
+# api_type = "azure"
+# api_base = "https://your-openai-endpoint.openai.azure.com"
+# api_version = "2024-12-01-preview"
+# api_key = "your-azure-openai-key"
+# deployment_id = "o3-mini"
+
 AZURE_SEARCH_ENDPOINT = st.secrets["azure"]["search_endpoint"]
 AZURE_SEARCH_API_KEY = st.secrets["azure"]["search_api_key"]
 AZURE_SEARCH_INDEX_NAME = st.secrets["azure"]["search_index_name"]
@@ -19,10 +33,13 @@ openai.api_key = st.secrets["openai"]["api_key"]
 
 DEPLOYMENT_ID = st.secrets["openai"]["deployment_id"]
 
+###################################
+# Function: Query Azure Cognitive Search
+###################################
 def query_azure_search(query, k=3):
     """
     Queries Azure Cognitive Search for the given query,
-    returns up to k relevant documents concatenated as a context string.
+    concatenates up to k relevant documents as a context string.
     """
     search_client = SearchClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
@@ -36,11 +53,14 @@ def query_azure_search(query, k=3):
         context += content + "\n"
     return context.strip()
 
+###################################
+# Function: Generate Answer using Azure OpenAI
+###################################
 def generate_answer(question, temperature=0.7, max_tokens=200):
     """
     1. Retrieve context from Azure Cognitive Search.
     2. Build a prompt with context and question.
-    3. Call Azure OpenAI with updated parameters and return the answer.
+    3. Use the updated OpenAI API call with the correct parameters.
     """
     context = query_azure_search(question, k=3)
     if not context:
@@ -53,95 +73,44 @@ def generate_answer(question, temperature=0.7, max_tokens=200):
         "An airport operator in India submits a multiyear tariff proposal (MYTP) to Airports economic authority of India (AERA or authority) for every five years to obtain an approval for multi year tariff. "
         "Control Period means a period of five Tariff Years, during which the Multi Year Tariff Order and Tariff(s) as determined by the Authority pursuant to such order shall subsist. "
         "The authority examines various regulatory blocks to determine the tariff for the control period. Such regulatory blocks include capital expenditure (CAPEX), Operational expenditure (Opex), depreciation, fair rate of return, traffic and taxes. "
-        "The authority examines the MYTP submitted by the airport and publishes a consultation paper constituting the submissions by airport operator, justifications and rationale provided by airport operator for each regulatory block such as capex, opex, depreciation, fair rate of return, traffic and taxes, draft decisions or proposals or considerations by authority on the submissions made by the airport operator. "
-        "Subsequent to publishing of consultation paper the authority invites comments and opinions from various stakeholders such as airlines, airline associations and other players in the aviation ecosystem. "
-        "In addition to the same the authority also gives the opportunity for the airport operator to provide counter arguments against the draft decisions or proposals or considerations made by the authority in the consultation paper and the comments provided by the stakeholders. "
-        "The authority examines the opinions from the stakeholders counter arguments from airport on the above said aspects to arrive at the final decision in the approved or final multi year tariff order for the airport operator. "
+        "The authority examines the MYTP submitted by the airport and publishes a consultation paper constituting the submissions by airport operator, justifications and rationale provided by the airport operator for each regulatory block such as capex, opex, depreciation, fair rate of return, traffic and taxes, draft decisions or proposals or considerations by the authority on the submissions made by the airport operator. "
+        "Subsequent to publishing the consultation paper the authority invites comments and opinions from various stakeholders such as airlines, airline associations and other players in the aviation ecosystem. "
+        "In addition, the authority also gives the opportunity for the airport operator to provide counter arguments against the draft decisions or proposals or considerations made by the authority and the comments provided by the stakeholders. "
         "The consultation paper and tariff order for a particular control period consists of two major sections, namely, true up and projections of regulatory blocks such as capex, opex, depreciation, fair rate of return, traffic and taxes. "
-        "The true up of regulatory blocks such as capex, opex, depreciation, fair rate of return, traffic and taxes mentioned in the tariff order or consultation paper for a specific control period refers to the reconciliation of actual numbers with respect to the approved numbers by the authority for the previous control period. "
-        "The projections of regulatory blocks such as capex, opex, depreciation, fair rate of return, traffic and taxes mentioned in the tariff order or consultation paper for a specific control period refers to the projected or estimated numbers of regulatory blocks such as traffic, capex, opex, depreciation, fair rate of return and taxes for that particular control period. "
-        "The user will ask questions to extract data from the consultation paper or tariff order prepared by the authority (Airport economic regulator authority of India) for various airport operators such as DIAL, CSMIA, etc. "
-        "When the user asks a question pertaining to traffic submitted by an airport operator, it should only extract data from those tables which specifically has title mentioning that the traffic is submitted by the airport operator such as DIAL, MIAL, CSMIA, BIAL, etc. "
-        "When the user asks a question pertaining to traffic proposed or approved by the authority, it should only extract data from those tables which specifically has title mentioning that the traffic is proposed or approved by the authority. "
-        "When the user asks a question pertaining to traffic projected by an independent consultant, it should only extract data from those tables which specifically has title mentioning the name of the independent consultant. It should not take the data from those tables which mentions traffic submitted by the airport operator or traffic proposed or approved by authority. "
-        "When the user asks a question pertaining to traffic, it can include multiple types of traffic such as passenger traffic (expressed in MPPA (million passenger per annum) or million), cargo traffic (expressed in MT or thousands metric tonnes) and ATM (also called departures and expressed in thousands or millions unit). Data for such subcategories should be separately extracted from the tables which specifically has title mentioning that the traffic is submitted by the airport operator or proposed by the authority. "
-        "When the user asks a question pertaining to total passenger traffic, it should extract the data from the row which mentions the total traffic containing the summation of individual traffic figures of international passenger traffic and domestic passenger traffic. "
-        "When the user asks a question pertaining to total cargo traffic, it should extract the data from the row which mentions the total traffic containing the summation of individual traffic figures of international cargo traffic and domestic cargo traffic. "
-        "When the user asks a question pertaining to total ATM or departure traffic, it should extract the data from the row which mentions the total traffic containing the summation of individual traffic figures of international ATM or departures and domestic ATM or departures. "
-        "When the user asks a question pertaining to the true up, the data should be extracted only from those tables which specifically has the title mentioning that the traffic is for true up. "
-        "When the user asks a question pertaining to projected traffic figures or projections, the data should be extracted only from those tables which specifically has title mentioning projections or projected traffic figures or estimations. "
-        "When the user asks a question pertaining to the projected traffic figures, the data should be extracted only from those tables which specifically has title mentioning that the traffic figures are projections. "
-        "When the user asks year on year traffic figures, the data should be extracted based on the year given on the top row of the table for relevant traffic type. "
-        "When the user asks CAGR of a traffic type (such as international, domestic, ATM), the data should be extracted if the same is explicitly mentioned and calculated. If the same is not mentioned the same can be calculated from the relevant table data. "
-        "When answering, format your output as an HTML table with clear headers and rows. For example, your output should resemble:\n\n"
-        "<table border=\"1\" cellspacing=\"0\" cellpadding=\"5\">\n"
-        "  <thead>\n"
-        "    <tr>\n"
-        "      <th>Fiscal Year (FY end)</th>\n"
-        "      <th>International ATM (Billable) (in '000s)</th>\n"
-        "    </tr>\n"
-        "  </thead>\n"
-        "  <tbody>\n"
-        "    <tr>\n"
-        "      <td>2025</td>\n"
-        "      <td>59.31</td>\n"
-        "    </tr>\n"
-        "    <tr>\n"
-        "      <td>2026</td>\n"
-        "      <td>62.18</td>\n"
-        "    </tr>\n"
-        "    <tr>\n"
-        "      <td>2027</td>\n"
-        "      <td>65.52</td>\n"
-        "    </tr>\n"
-        "    <tr>\n"
-        "      <td>2028</td>\n"
-        "      <td>68.59</td>\n"
-        "    </tr>\n"
-        "    <tr>\n"
-        "      <td>2029</td>\n"
-        "      <td>71.33</td>\n"
-        "    </tr>\n"
-        "    <tr>\n"
-        "      <td><strong>TOTAL</strong></td>\n"
-        "      <td><strong>326.92</strong></td>\n"
-        "    </tr>\n"
-        "  </tbody>\n"
-        "</table>\n\n"
-        "References:\n"
-        "- Document: 17383225584994.pdf – “TRAFFIC PROJECTIONS FOR THE FOURTH CONTROL PERIOD”\n"
-        "- Table: Table 179 – Traffic Projections submitted by DIAL for the Fourth Control Period\n"
-        "Also ensure that data is only extracted from tables whose titles specify the source (e.g., 'submitted by DIAL', 'proposed by the Authority', etc.)."
+        "When answering, format your output as an HTML table with clear headers and rows."
     )
 
     response = openai.ChatCompletion.create(
-        engine=DEPLOYMENT_ID,  # Updated parameter
+        engine=DEPLOYMENT_ID,          # Updated parameter: use 'engine' for Azure deployments
         messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,  # Pass temperature
-        max_tokens=max_tokens,    # Updated parameter
+        temperature=temperature,       # Pass the temperature as defined
+        max_tokens=max_tokens          # Use 'max_tokens' instead of 'max_completion_tokens'
     )
     answer = response.choices[0].message["content"]
     return answer
 
+###################################
+# Function: Convert Image to Base64 for Embedding
+###################################
 def get_base64_image(image_path: str) -> str:
     """
-    Reads an image file from the given path and returns the base64-encoded string.
+    Reads an image file from the given path and returns a base64-encoded string.
     Suitable for embedding in HTML.
     """
     with open(image_path, "rb") as f:
         data = f.read()
     return base64.b64encode(data).decode("utf-8")
 
-#############################
-# Streamlit App with Conversation History
-#############################
+###################################
+# Streamlit App Setup and Layout Configuration
+###################################
 st.set_page_config(layout="wide")
 
-# --- Specify the path to your local logo ---
-logo_path = "bial_logo.png"  # Ensure the logo image is in your repo
+# --- Local Logo Setup ---
+logo_path = "bial_logo.png"  # Place your logo file in your repository
 logo_base64 = get_base64_image(logo_path)
 
-# --- Custom CSS for styling ---
+# --- Custom CSS for Styling ---
 st.markdown(
     """
     <style>
@@ -174,7 +143,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Sidebar: Settings for model configuration
+###################################
+# Sidebar: Settings for Model Configuration
+###################################
 st.sidebar.header("Settings")
 temperature = st.sidebar.slider(
     "Temperature",
@@ -193,11 +164,15 @@ max_tokens = st.sidebar.slider(
     help="Controls the maximum tokens in the generated answer"
 )
 
-# Initialize conversation history in session state
+###################################
+# Initialize Session State for Conversation History
+###################################
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 
-# Page Title / Header with logo
+###################################
+# App Header: Title with Logo
+###################################
 st.markdown(
     f"""
     <div class="title-bar">
@@ -208,7 +183,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Input Section: Predefined Questions & Custom Input
+###################################
+# Input Section: Predefined Questions & Custom Question Input
+###################################
 st.write("Choose a predefined question or type your own question below:")
 predefined_questions = [
     "what is passenger traffic submiited by DIAL for fourth control period?",
@@ -221,7 +198,9 @@ question_input = st.text_area("Your question:", key="question", height=100)
 if selected_predef != "(None)":
     question_input = selected_predef
 
-# Submit Button: Generate and display the answer
+###################################
+# Submit Button: Generate and Display Answer
+###################################
 if st.button("Submit"):
     if not question_input.strip():
         st.warning("Please enter a question or select a predefined one.")
@@ -239,10 +218,13 @@ if st.button("Submit"):
         # Log the conversation in session state
         st.session_state.conversation_history.append({"question": question_input, "response": answer})
 
-# Conversation History: Display previous interactions
+###################################
+# Conversation History Display
+###################################
 if st.session_state.conversation_history:
     with st.expander("Conversation History"):
         for idx, entry in enumerate(st.session_state.conversation_history, start=1):
             st.markdown(f"**Q{idx}:** {entry['question']}")
             st.markdown(f"**A:** {entry['response']}")
+
 
