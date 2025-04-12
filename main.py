@@ -20,7 +20,7 @@ openai.api_base = st.secrets["openai"]["api_base"]
 openai.api_version = st.secrets["openai"]["api_version"]
 openai.api_key = st.secrets["openai"]["api_key"]
 
-# Deployment ID (your Azure OpenAI model name, e.g. "o3-mini")
+# Deployment ID for your Azure OpenAI chat model (e.g. "o3-mini")
 DEPLOYMENT_ID = st.secrets["openai"]["deployment_id"]
 
 def query_azure_search(query, k=3):
@@ -119,9 +119,9 @@ def generate_answer(question, temperature=0.7, max_tokens=200):
     )
 
     response = openai.ChatCompletion.create(
-        engine=DEPLOYMENT_ID,  # Use engine instead of deployment_id
+        engine=DEPLOYMENT_ID,  # Updated parameter: use engine instead of deployment_id
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,  # Use max_tokens instead of max_completion_tokens
+        max_tokens=max_tokens,  # Updated parameter: use max_tokens instead of max_completion_tokens
     )
     answer = response.choices[0].message["content"]
     return answer
@@ -248,6 +248,3 @@ if st.session_state.conversation_history:
         for idx, entry in enumerate(st.session_state.conversation_history, start=1):
             st.markdown(f"**Q{idx}:** {entry['question']}")
             st.markdown(f"**A:** {entry['response']}")
-
-
-
