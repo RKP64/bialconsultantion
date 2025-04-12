@@ -8,20 +8,6 @@ from azure.core.credentials import AzureKeyCredential
 ###################################
 # Credentials from Streamlit Secrets
 ###################################
-# The secrets file should have a structure similar to:
-#
-# [azure]
-# search_endpoint = "https://your-search-endpoint.search.windows.net"
-# search_api_key = "your-azure-search-api-key"
-# search_index_name = "your-search-index-name"
-#
-# [openai]
-# api_type = "azure"
-# api_base = "https://your-openai-endpoint.openai.azure.com"
-# api_version = "2024-12-01-preview"
-# api_key = "your-azure-openai-key"
-# deployment_id = "o3-mini"
-
 AZURE_SEARCH_ENDPOINT = st.secrets["azure"]["search_endpoint"]
 AZURE_SEARCH_API_KEY = st.secrets["azure"]["search_api_key"]
 AZURE_SEARCH_INDEX_NAME = st.secrets["azure"]["search_index_name"]
@@ -54,7 +40,7 @@ def generate_answer(question, temperature=0.7, max_tokens=200):
     """
     1. Retrieve context from Azure Cognitive Search.
     2. Build a prompt with context and question.
-    3. Call Azure OpenAI with 'max_completion_tokens' and return the answer.
+    3. Call Azure OpenAI with updated parameters and return the answer.
     """
     context = query_azure_search(question, k=3)
     if not context:
@@ -129,9 +115,10 @@ def generate_answer(question, temperature=0.7, max_tokens=200):
     )
 
     response = openai.ChatCompletion.create(
-        deployment_id=DEPLOYMENT_ID,
+        engine=DEPLOYMENT_ID,  # Updated parameter
         messages=[{"role": "user", "content": prompt}],
-        max_completion_tokens=max_tokens,
+        temperature=temperature,  # Pass temperature
+        max_tokens=max_tokens,    # Updated parameter
     )
     answer = response.choices[0].message["content"]
     return answer
@@ -258,3 +245,4 @@ if st.session_state.conversation_history:
         for idx, entry in enumerate(st.session_state.conversation_history, start=1):
             st.markdown(f"**Q{idx}:** {entry['question']}")
             st.markdown(f"**A:** {entry['response']}")
+
